@@ -31,7 +31,7 @@ def mk_routeset(FILE):
 
 
 def mk_routegraph(airport_data, extracted_data):
-    G = nx.Graph()
+    G = nx.DiGraph()
 
     # Add nodes to the graph using airport_data
     for airport_id, airport_info in airport_data.items():
@@ -45,7 +45,10 @@ def mk_routegraph(airport_data, extracted_data):
     # Add edges to the graph using extracted_data
     for edge in extracted_data:
         source_airport_id, destination_airport_id = edge
-        G.add_edge(source_airport_id, destination_airport_id)
+        if source_airport_id in airport_data.keys() and destination_airport_id in airport_data.keys():
+            G.add_edge(source_airport_id, destination_airport_id)
+        
+        
 
     return G
 
@@ -59,10 +62,25 @@ routes = mk_routeset(ROUTES_FILE)
 
 graph = mk_routegraph(airport_data, routes)
 
-#print(graph.edges())
-print(graph.nodes.data())
+# print(len(graph.edges()))
+#print(len(graph.nodes.data()))
 
 # Visualize the graph (optional)
 #  # You can change the layout as needed
 # nx.draw(graph)
 # plt.show()
+x = []
+y = []
+for airport_id, airport_info in airport_data.items():
+        
+        lat = airport_info[5]
+        x.append(float(lat))
+        lot = airport_info[6]
+        y.append(float(lot))
+
+
+
+plt.scatter(y, x)
+
+# To show the plot
+plt.show()
