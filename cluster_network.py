@@ -2,11 +2,10 @@ import networkx as nx
 import csv
 import matplotlib.pyplot as plt
 import random
-from math import cos, sqrt, pi
+from sklearn.cluster import KMeans
+import numpy as np
+import sys
 
-
-AIRPORTS_FILE = 'airports.dat'
-ROUTES_FILE = 'routes.dat'
 
 def mk_airportdict(FILE):
     airport_dict = {}
@@ -46,14 +45,24 @@ def mk_routegraph(airport_data, extracted_data):
         if source_airport_id in airport_data.keys() and destination_airport_id in airport_data.keys():
             source_coords = (float(airport_data[source_airport_id][5]), float(airport_data[source_airport_id][6]))
             dest_coords = (float(airport_data[destination_airport_id][5]), float(airport_data[destination_airport_id][6]))
-
-            # Calculate distance as the weight attribute
             distance = ((source_coords[0] - dest_coords[0]) ** 2 + (source_coords[1] - dest_coords[1]) ** 2) ** 0.5
             G.add_edge(source_airport_id, destination_airport_id, weight=distance)
 
     return G
 
-def plot_routes(routegraph):
+def visualize_airports(graph):
+    x = []
+    y = []
+    for airport_id, airport_info in airport_data.items():
+            lat = airport_info[5]
+            x.append(float(lat))
+            lon = airport_info[6]
+            y.append(float(lon))
+
+    plt.scatter(y, x, s= 2)
+    plt.show()
+
+def visualize_plot_routes(routes):
     x = []
     y = []
     for airport_id, airport_info in airport_data.items():
@@ -64,30 +73,29 @@ def plot_routes(routegraph):
 
     plt.scatter(y, x, s= 2)
 
-    # Draw edges on the scatter plot
     for edge in graph.edges():
         source_id, dest_id = edge
         source_coords = (float(airport_data[source_id][5]), float(airport_data[source_id][6]))
         dest_coords = (float(airport_data[dest_id][5]), float(airport_data[dest_id][6]))
         colors = ['red','yellow','green','purple']
         plt.plot([source_coords[1], dest_coords[1]], [source_coords[0], dest_coords[0]], color=random.choice(colors), alpha=0.5, linewidth=0.2)
-
-    # To show the plot
+    
     plt.show()
 
 def k_spanning_tree(G, k=1000):
 
     # Convert the directed graph to an undirected graph
     undirected_graph = G.to_undirected()
-    min_spanning_edges = list(nx.minimum_spanning_edges(undirected_graph, algorithm='kruskal', data=False))
-    sorted_edges = sorted(G.edges(data=True), key=lambda x: x[2].get('weight', 1), reverse=True)
-    edges_to_remove = sorted_edges[:k-1]
-    new_graph = G.copy()
-    new_graph.remove_edges_from(edges_to_remove)
+    undirected_graph_copy = nx.create_empty_copy(undirected_graph)
+    
+    min_spanning_edges = list(nx.algorithms.tree.mst.minimum_spanning_edges(undirected_graph, algorithm='kruskal', data=True))
+    sorted_edges = sorted(min_spanning_edges, key=lambda x: x[2].get('weight', 1), reverse=False)
+    edges_to_keep = sorted_edges[:-k+1]
+    undirected_graph_copy.add_edges_from(edges_to_keep)
 
-    return new_graph
+    return undirected_graph_copy
 
-def visualize_graph(graph):
+def visualize_disconnected_clusters(graph):
     x = []
     y = []
 
@@ -95,7 +103,7 @@ def visualize_graph(graph):
         x.append(data['lat'])
         y.append(data['lon'])
 
-    plt.scatter(y, x, s=2)
+    plt.scatter(y, x, s=1)
 
     for edge in graph.edges():
         source_coords = graph.nodes[edge[0]]
@@ -106,85 +114,76 @@ def visualize_graph(graph):
             [source_coords['lat'], dest_coords['lat']],
             color=random.choice(colors),
             alpha=0.5,
-            linewidth=0.2
+            linewidth=1.5
         )
 
     plt.title('K-Spanning Tree Visualization')
     plt.show()
 
+def k_means(data, k=7):
+    
+    data_array = np.array(data)
+    kmeans = KMeans(n_clusters=k, random_state=0)
+    labels = kmeans.fit_predict(data_array)
+
+    return labels
+
+def visualize_k_means(data, k=7):
+
+    coordinates = [(float(info[5]), float(info[6])) for info in airport_data.values()]
+    labels = k_means(coordinates, k)
+    for i in range(k):
+        cluster_points = np.array([coordinates[j] for j in range(len(coordinates)) if labels[j] == i])
+        plt.scatter(cluster_points[:, 1], cluster_points[:, 0], s=0.2)
+
+    plt.title(f'K-Means Clustering (k={k})')
+    plt.xlabel('Longitude')
+    plt.ylabel('Latitude')
+    plt.show()
+
+
+if __name__ == '__main__':
+    
+    arg1 = sys.argv[1]
+    AIRPORTS_FILE = 'airports.dat'
+    ROUTES_FILE = 'routes.dat'
+    
+    airport_data = mk_airportdict(AIRPORTS_FILE)
+    routes_list = mk_routeset(ROUTES_FILE)
+    graph = mk_routegraph(airport_data, routes_list)
+
+    if arg1 == 'airports':
+        plt.figure(1)
+        visualize_airports(airport_data)
+    elif arg1 == 'routes':
+        plt.figure(2)
+        visualize_plot_routes(routes_list)
+    elif arg1 == 'span':
+        plt.figure(3)
+        k_value = int(sys.argv[2])
+        visualize_disconnected_clusters(k_spanning_tree(graph, k=k_value))
+    elif arg1 == 'means':
+        plt.figure(4)
+        k_value = int(sys.argv[2])
+        visualize_k_means(airport_data, k=k_value)
+    else:
+        print(f"Unknown argument: {arg1}")
+
+    plt.show()
+
 
 # Example usage:
-airport_data = mk_airportdict(AIRPORTS_FILE)
-routes = mk_routeset(ROUTES_FILE)
-graph = mk_routegraph(airport_data, routes)
-# print(graph)
+# AIRPORTS_FILE = 'airports.dat'
+# ROUTES_FILE = 'routes.dat'
 
-# Call the k_spanning_tree function
-k = 1000  # You can adjust k as needed
-k_spanning_tree_graph  = k_spanning_tree(graph, k)
-# print(k_spanning_tree_graph)
+# airport_data = mk_airportdict(AIRPORTS_FILE)
+# routes = mk_routeset(ROUTES_FILE)
+# graph = mk_routegraph(airport_data, routes)
 
-# Visualize the resulting graph
-visualize_graph(k_spanning_tree_graph )
-# plot_graph(k_spanning_tree_graph, airport_data)
+# k = 1000
+# k_spanning_tree_graph  = k_spanning_tree(graph, k)
 
+# visualize_plot_routes(routes)
+# visualize_disconnected_clusters(k_spanning_tree_graph)
+# visualize_k_means(airport_data, k=7)
 
-
-
-
-
-
-
-
-
-
-# def plot_graph(graph, airport_data):
-#     x = []
-#     y = []
-#     for airport_id, airport_info in airport_data.items():
-#         lat = airport_info[5]
-#         x.append(float(lat))
-#         lon = airport_info[6]
-#         y.append(float(lon))
-
-#     plt.scatter(y, x, s=2)
-
-#     # Draw edges on the scatter plot
-#     for edge in graph.edges(data=True):
-#         source_id, dest_id, edge_data = edge
-#         source_coords = (float(airport_data[source_id][5]), float(airport_data[source_id][6]))
-#         dest_coords = (float(airport_data[dest_id][5]), float(airport_data[dest_id][6]))
-
-#         # Access the 'weight' attribute for color
-#         weight = edge_data.get('weight', 1)
-
-#         colors = ['red', 'yellow', 'green', 'purple']
-#         plt.plot([source_coords[1], dest_coords[1]], [source_coords[0], dest_coords[0]],
-#                  color=random.choice(colors), alpha=0.5, linewidth=0.2)
-
-#     # To show the plot
-#     plt.title('k-Spanning Tree Visualization')
-#     plt.show()
-
-
-
-# def distance_between_edges(edges, ap1, ap2):
-
-#     r = 6371.0   # Radius of Earth km
-#     lat_1 = edges[ap1]['lat'] * pi/180
-#     lon_1 = edges[ap1]['lon'] * pi/180
-#     lat_2 = edges[ap2]['lat'] * pi/180
-#     lon_2 = edges[ap2]['lon'] * pi/180
-#     dlat = lat_2 - lat_1
-#     dlon = lon_2 - lon_1
-#     meanlat = (lat_1 + lat_2) / 2
-    
-#     distance = r* sqrt(dlat **2 + (cos(meanlat) * dlon) **2 )
-    
-#     return distance
-
-# def set_edge_weights(graph, distance_function):
-#     for edge in graph.edges():
-#         source_id, dest_id = edge
-#         distance = distance_function(graph.nodes, source_id, dest_id)
-#         graph[source_id][dest_id]['weight'] = distance
